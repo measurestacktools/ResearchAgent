@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResearchAgent — AI Research Workspace</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">◈</span> ResearchAgent <span class="tag">source-grounded research</span></div>
+  <div class="top-actions">
+    <span id="statusPill" class="pill unknown">checking…</span>
+    <button id="settingsBtn" class="btn ghost">⚙ Settings</button>
+  </div>
+</header>
+
+<div class="honesty-banner">🔒 No web search. All analysis is over <b>your pasted sources only</b>. <span class="src-legend">Source text</span> is visually separated from <span class="ai-legend">AI analysis</span>.</div>
+
+<main class="workspace">
+  <!-- STEP 1 -->
+  <section class="panel" id="panel-question">
+    <div class="step">STEP 1 · QUESTION</div>
+    <h2>Research question</h2>
+    <textarea id="question" rows="3" maxlength="2000" placeholder="e.g. Do short daily walks improve sleep quality in adults?"></textarea>
+    <div class="row">
+      <button id="planBtn" class="btn primary">Generate research plan</button>
+      <button id="followupsBtn" class="btn">Follow-up questions</button>
+    </div>
+    <div id="planOut" class="output"><span class="muted">Your research plan will appear here.</span></div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel" id="panel-sources">
+    <div class="step">STEP 2 · SOURCES (paste only, max 6)</div>
+    <h2>Sources <span id="srcCount" class="count">0 / 6</span></h2>
+    <input id="srcTitle" maxlength="200" placeholder="Source title (e.g. Walker et al. notes)">
+    <textarea id="srcText" rows="5" maxlength="8000" placeholder="Paste source text here (max 8000 chars)…"></textarea>
+    <div class="row between">
+      <span id="charCount" class="muted">0 / 8000</span>
+      <button id="addSrcBtn" class="btn primary">＋ Add source</button>
+    </div>
+    <div id="srcList" class="srclist"></div>
+    <div class="row">
+      <button id="clearSrcBtn" class="btn danger-ghost">Clear all sources</button>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="panel" id="panel-analysis">
+    <div class="step">STEP 3 · ANALYSIS (grounded in sources)</div>
+    <h2>Analysis</h2>
+    <div class="grid-btns">
+      <button class="btn" data-job="summarize">Summarize source</button>
+      <button class="btn" data-job="claims">Extract key claims</button>
+      <button class="btn" data-job="compare">Cross-source compare</button>
+      <button class="btn" data-job="findings">Key findings</button>
+    </div>
+    <div class="row">
+      <select id="srcSelect" title="Source for per-source jobs"></select>
+    </div>
+    <div class="row">
+      <input id="askInput" placeholder="Free ask (answered only from your sources)…">
+      <button id="askBtn" class="btn">Ask</button>
+    </div>
+    <div id="analysisOut" class="output"><span class="muted">Analysis results appear here. Claims are tagged with [Source: title].</span></div>
+  </section>
+
+  <!-- STEP 4 -->
+  <section class="panel wide" id="panel-report">
+    <div class="step">STEP 4 · REPORT</div>
+    <h2>Structured report</h2>
+    <div class="row">
+      <button id="reportBtn" class="btn primary">Generate full report</button>
+      <button id="copyBtn" class="btn">⧉ Copy</button>
+      <button id="dlBtn" class="btn">⬇ Download .md</button>
+      <button id="resetBtn" class="btn danger-ghost">Reset session</button>
+    </div>
+    <div class="report-wrap">
+      <div class="report-label">FROM SOURCES vs AI ANALYSIS — report sections are labeled; verify every tagged claim.</div>
+      <pre id="reportOut" class="report">No report yet. Add ≥1 source, enter a question, then “Generate full report”.</pre>
+    </div>
+    <div id="err" class="err" hidden></div>
+  </section>
+</main>
+
+<footer class="foot">ResearchAgent · model openai/gpt-oss-120b via Groq · honesty-first: no invented citations.</footer>
+
+<!-- Settings modal -->
+<div id="settingsModal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Settings — Groq API key</h3>
+    <p class="muted">Session-memory only (sessionStorage). Never committed or exposed. <code>.env</code> fallback supported.</p>
+    <input id="keyInput" type="password" placeholder="gsk_…">
+    <div class="row">
+      <button id="verifyBtn" class="btn primary">Save &amp; verify</button>
+      <button id="removeKeyBtn" class="btn danger-ghost">Remove</button>
+      <button id="closeSettings" class="btn ghost">Close</button>
+    </div>
+    <div id="keyMsg" class="muted"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
