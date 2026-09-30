@@ -5,8 +5,6 @@ let chatHistory = [];
 
 function headers(extra = {}) {
   const h = { "Content-Type": "application/json", "X-Session-Id": sessionId, ...extra };
-  const k = sessionStorage.getItem("ra_key");
-  if (k) h["X-Groq-Key"] = k;
   return h;
 }
 function showErr(m) { const e = $("err"); e.hidden = false; e.textContent = m; }
@@ -70,7 +68,6 @@ $("clearSrcBtn").onclick = async () => { await fetch("/api/sources", { method: "
 async function runAnalyze(job, extra = {}) {
   clearErr();
   const body = { job, question: $("question").value.trim(), ...extra };
-  const key = sessionStorage.getItem("ra_key"); if (key) body.key = key;
   const r = await fetch("/api/analyze", { method: "POST", headers: headers(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error(await parseErr(r));
   return (await r.json()).result;
@@ -82,8 +79,7 @@ $("planBtn").onclick = async () => {
   if (!q) return showErr("Research question is required.");
   $("planOut").textContent = "Generating plan…";
   try {
-    const key = sessionStorage.getItem("ra_key");
-    const r = await fetch("/api/plan", { method: "POST", headers: headers(), body: JSON.stringify({ question: q, key }) });
+    const r = await fetch("/api/plan", { method: "POST", headers: headers(), body: JSON.stringify({ question: q }) });
     if (!r.ok) throw new Error(await parseErr(r));
     $("planOut").textContent = (await r.json()).plan;
   } catch (e) { $("planOut").textContent = "Failed."; showErr(e.message); }
@@ -151,10 +147,10 @@ $("verifyBtn").onclick = async () => {
   const k = $("keyInput").value.trim();
   if (!k) { $("keyMsg").textContent = "Paste a key first."; return; }
   $("keyMsg").textContent = "Verifying…";
-  const r = await fetch("/api/settings/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k }) });
-  if (r.ok) { sessionStorage.setItem("ra_key", k); $("keyMsg").textContent = "✓ Key verified (session only)."; refreshStatus(); }
+  const r = await fetch("/api/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k }) });
+  if (r.ok) { $("keyInput").value = ""; $("keyMsg").textContent = "✓ Key verified (server memory)."; refreshStatus(); }
   else { $("keyMsg").textContent = "✗ " + await parseErr(r); }
 };
-$("removeKeyBtn").onclick = () => { sessionStorage.removeItem("ra_key"); $("keyInput").value = ""; $("keyMsg").textContent = "Key removed from session."; refreshStatus(); };
+$("removeKeyBtn").onclick = async () => { await fetch("/api/key", { method: "DELETE" }); $("keyInput").value = ""; $("keyMsg").textContent = "Key removed from server memory."; refreshStatus(); };
 
 refreshStatus(); refreshSources();

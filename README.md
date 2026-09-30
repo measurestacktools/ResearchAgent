@@ -14,7 +14,7 @@ and the UI visually separates source text from AI analysis. Every claim is tagge
 - Cross-source compare (agreements / disagreements, each claim tagged with source title)
 - Full structured report + key findings + follow-up questions
 - Report view with **Copy** + **Download (.md)**; Clear/reset session
-- Settings modal (paste key, live `models.list` verify, sessionStorage only, Remove) + `.env` fallback + `GET /api/status` pill
+- Settings modal (paste key, live `models.list` verify via `POST /api/key` into server process memory only — never browser storage, `DELETE /api/key` to remove) + `.env` fallback + `GET /api/status` pill (`key_source`: settings|env|none)
 - Validation + friendly errors; Groq 401/429/404/503/connection mapped
 
 ## Run

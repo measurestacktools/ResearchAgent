@@ -21,12 +21,13 @@ app = FastAPI(title="ResearchAgent")
 # In-memory sessions: {session_id: {"sources": [{"title":..., "text":...}]}}
 SESSIONS: Dict[str, Dict] = {}
 
+# Server-memory API key (process-global). NEVER sent to / stored in browser.
+_session_key: Optional[str] = None
+
 VALID_JOBS = {"plan", "summarize", "claims", "compare", "report", "findings", "followups", "ask"}
 
 
-def resolve_key(header_key: Optional[str]) -> Optional[str]:
-    if header_key and header_key.strip():
-        return header_key.strip()
+def _env_key() -> Optional[str]:
     for name in ("GROQ_API_KEY", "GROQ_TEST_KEY"):
         v = os.environ.get(name, "").strip()
         if v:
@@ -45,6 +46,14 @@ def resolve_key(header_key: Optional[str]) -> Optional[str]:
     except Exception:
         pass
     return None
+
+
+def resolve_key(_ignored: Optional[str] = None) -> Optional[str]:
+    # Client-supplied keys (body.key / X-Groq-Key) are intentionally ignored.
+    # Server-memory key first, then env/.env fallbacks.
+    if _session_key and _session_key.strip():
+        return _session_key.strip()
+    return _env_key()
 
 
 def get_session(session_id: Optional[str]) -> tuple[str, Dict]:
@@ -125,9 +134,35 @@ class VerifyIn(BaseModel):
 # ---------- Routes ----------
 @app.get("/api/status")
 def api_status(x_groq_key: Optional[str] = Header(default=None, alias="X-Groq-Key")):
-    key = resolve_key(x_groq_key)
-    src = "header" if (x_groq_key and x_groq_key.strip()) else ("env" if key else "none")
-    return {"has_key": bool(key), "model": MODEL_ID, "key_source": src}
+    # x_groq_key accepted in signature for backwards-compat but ignored.
+    _ = x_groq_key
+    if _session_key and _session_key.strip():
+        return {"has_key": True, "model": MODEL_ID, "key_source": "settings"}
+    env_key = _env_key()
+    return {"has_key": bool(env_key), "model": MODEL_ID, "key_source": "env" if env_key else "none"}
+
+
+@app.post("/api/key")
+def api_set_key(body: VerifyIn):
+    global _session_key
+    key = (body.key or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="API key is required.")
+    try:
+        client = groq_client(key)
+        client.models.list()
+        _session_key = key
+        return {"ok": True, "verified": True}
+    except Exception as e:
+        code, friendly = map_groq_error(e)
+        raise HTTPException(status_code=code, detail=friendly)
+
+
+@app.delete("/api/key")
+def api_delete_key():
+    global _session_key
+    _session_key = None
+    return {"ok": True}
 
 
 @app.post("/api/settings/verify")
@@ -151,9 +186,9 @@ def api_plan(body: PlanIn, x_groq_key: Optional[str] = Header(default=None, alia
         raise HTTPException(status_code=400, detail="Research question is required.")
     if len(q) > 2000:
         raise HTTPException(status_code=400, detail="Question is too long (max 2000 chars).")
-    api_key = resolve_key(body.key or x_groq_key)
+    api_key = resolve_key()
     if not api_key:
-        raise HTTPException(status_code=503, detail="No Groq API key configured. Open Settings and paste your key, or set GROQ_API_KEY in .env.")
+        raise HTTPException(status_code=401, detail="No Groq API key configured. Open Settings and paste your key, or set GROQ_API_KEY in .env.")
     system = (
         "You are a research planner. Given ONLY the user's research question, produce a short structured research plan. "
         "Output markdown with headings: Objectives, Key sub-questions (numbered, max 6), Suggested source types, Search terms, Evaluation criteria, Limitations. "
@@ -215,9 +250,9 @@ def api_analyze(body: AnalyzeIn, x_groq_key: Optional[str] = Header(default=None
         raise HTTPException(status_code=400, detail=f"Unknown job '{body.job}'. Valid: {sorted(VALID_JOBS)}.")
     sid, sess = get_session(x_session_id)
     sources: List[Dict] = sess["sources"]
-    api_key = resolve_key(body.key or x_groq_key)
+    api_key = resolve_key()
     if not api_key:
-        raise HTTPException(status_code=503, detail="No Groq API key configured. Open Settings and paste your key, or set GROQ_API_KEY in .env.")
+        raise HTTPException(status_code=401, detail="No Groq API key configured. Open Settings and paste your key, or set GROQ_API_KEY in .env.")
 
     def src_block(s, i):
         return f"--- SOURCE {i+1}: {s['title']} ---\n{s['text']}"
